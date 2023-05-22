@@ -14,9 +14,11 @@ import android.widget.TableRow;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.example.lab7.SocketManager.SocketManager;
+
 import java.util.Random;
 
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends AppCompatActivity implements SocketManager.SocketListener {
 
     private ImageView[][] imageViews = new ImageView[3][3];
     private int[][] board = new int[3][3];
@@ -24,6 +26,7 @@ public class MainActivity extends AppCompatActivity {
     private boolean gameEnded;
 
     private Button btnReset;
+    private SocketManager socketManager;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -32,6 +35,8 @@ public class MainActivity extends AppCompatActivity {
 
         TableLayout tableLayout = findViewById(R.id.tableLayout);
         btnReset = findViewById(R.id.btnEmpezar);
+
+        socketManager = new SocketManager(this);
 
         // Initialize the imageViews array and set click listeners
         for (int i = 0; i < 3; i++) {
@@ -47,6 +52,7 @@ public class MainActivity extends AppCompatActivity {
                         if (!gameEnded && board[rowIdx][colIdx] == 0) {
                             makeMove(rowIdx, colIdx);
                             checkGameStatus();
+                            sendMoveToOpponent(rowIdx, colIdx);
                         }
                     }
                 });
@@ -57,10 +63,17 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onClick(View v) {
                 resetGame();
+                sendResetToOpponent();
             }
         });
 
         resetGame();
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        socketManager.stopServer();
     }
 
     private void makeMove(int row, int col) {
@@ -138,5 +151,43 @@ public class MainActivity extends AppCompatActivity {
 
     private void showToast(String message) {
         Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
+    }
+
+    private void sendMoveToOpponent(int row, int col) {
+        // Construct the move message in the format "MOVE:row:col"
+        String moveMessage = "MOVE:" + row + ":" + col;
+        socketManager.sendMessage(moveMessage);
+    }
+
+    private void sendResetToOpponent() {
+        socketManager.sendMessage("RESET");
+    }
+
+    // SocketManager.SocketListener methods
+
+    @Override
+    public void onMessageReceived(String message) {
+        if (message.startsWith("MOVE:")) {
+            // Parse the move message and make the corresponding move
+            String[] parts = message.split(":");
+            if (parts.length == 3) {
+                int row = Integer.parseInt(parts[1]);
+                int col = Integer.parseInt(parts[2]);
+                makeMove(row, col);
+                checkGameStatus();
+            }
+        } else if (message.equals("RESET")) {
+            resetGame();
+        }
+    }
+
+    @Override
+    public void onClientConnected() {
+        showToast("Opponent connected");
+    }
+
+    @Override
+    public void onClientDisconnected() {
+        showToast("Opponent disconnected");
     }
 }
