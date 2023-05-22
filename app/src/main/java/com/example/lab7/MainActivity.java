@@ -9,230 +9,134 @@ import android.os.CountDownTimer;
 import android.view.View;
 import android.widget.Button;
 import android.widget.ImageView;
+import android.widget.TableLayout;
+import android.widget.TableRow;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import java.util.Random;
+
 public class MainActivity extends AppCompatActivity {
-    private ImageView imageView1, imageView2, imageView3, imageView4, imageView5, imageView6, imageView7, imageView8, imageView9;
-    private Button btnEmpezar;
-    private char currentPlayer;
-    private int moves;
-    private boolean gameOver;
-    private CountDownTimer timer;
+
+    private ImageView[][] imageViews = new ImageView[3][3];
+    private int[][] board = new int[3][3];
+    private int currentPlayer;
+    private boolean gameEnded;
+
+    private Button btnReset;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        imageView1 = findViewById(R.id.imageView1);
-        imageView2 = findViewById(R.id.imageView2);
-        imageView3 = findViewById(R.id.imageView3);
-        imageView4 = findViewById(R.id.imageView4);
-        imageView5 = findViewById(R.id.imageView5);
-        imageView6 = findViewById(R.id.imageView6);
-        imageView7 = findViewById(R.id.imageView7);
-        imageView8 = findViewById(R.id.imageView8);
-        imageView9 = findViewById(R.id.imageView9);
-        btnEmpezar = findViewById(R.id.btnEmpezar);
+        TableLayout tableLayout = findViewById(R.id.tableLayout);
+        btnReset = findViewById(R.id.btnEmpezar);
 
-        currentPlayer = ' ';
-        moves = 0;
-        gameOver = false;
-
-        showChooseSymbolAlert();
-    }
-
-    private void showChooseSymbolAlert() {
-        final CharSequence[] symbols = {"X", "O"};
-
-        AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        builder.setTitle("Elegir símbolo");
-        builder.setItems(symbols, new DialogInterface.OnClickListener() {
-            @Override
-            public void onClick(DialogInterface dialog, int which) {
-                currentPlayer = symbols[which].charAt(0);
-                startGame();
-            }
-        });
-        builder.setCancelable(false);
-        builder.show();
-    }
-
-    private void startGame() {
-        btnEmpezar.setEnabled(false);
-        resetBoard();
-
-        timer = new CountDownTimer(60000, 1000) {
-            @Override
-            public void onTick(long millisUntilFinished) {
-                updateTimerUI(millisUntilFinished);
-            }
-
-            @Override
-            public void onFinish() {
-                if (!gameOver) {
-                    Toast.makeText(MainActivity.this, "¡Tiempo agotado! No hay ganador.", Toast.LENGTH_SHORT).show();
-                    resetBoard();
-                }
-            }
-        };
-        timer.start();
-    }
-
-    private void resetBoard() {
-        imageView1.setImageResource(R.drawable.empty);
-        imageView2.setImageResource(R.drawable.empty);
-        imageView3.setImageResource(R.drawable.empty);
-        imageView4.setImageResource(R.drawable.empty);
-        imageView5.setImageResource(R.drawable.empty);
-        imageView6.setImageResource(R.drawable.empty);
-        imageView7.setImageResource(R.drawable.empty);
-        imageView8.setImageResource(R.drawable.empty);
-        imageView9.setImageResource(R.drawable.empty);
-
-        imageView1.setTag(null);
-        imageView2.setTag(null);
-        imageView3.setTag(null);
-        imageView4.setTag(null);
-        imageView5.setTag(null);
-        imageView6.setTag(null);
-        imageView7.setTag(null);
-        imageView8.setTag(null);
-        imageView9.setTag(null);
-
-        currentPlayer = ' ';
-        moves = 0;
-        gameOver = false;
-    }
-
-    private void updateTimerUI(long milliseconds) {
-        long seconds = milliseconds / 1000;
-        String timerText = "Temporizador: " + seconds + " segundos";
-        TextView temporizador = findViewById(R.id.temporizador);
-        temporizador.setText(timerText);
-    }
-
-    public void onCellClick(View view) {
-        if (!gameOver) {
-            ImageView cell = (ImageView) view;
-
-            if (cell.getTag() == null) {
-                cell.setImageResource(getSymbolImage(currentPlayer));
-                cell.setTag(currentPlayer);
-                moves++;
-
-                if (checkWin()) {
-                    gameOver = true;
-                    showWinnerAlert();
-                } else if (moves == 9) {
-                    gameOver = true;
-                    showDrawAlert();
-                } else {
-                    currentPlayer = (currentPlayer == 'X') ? 'O' : 'X';
-                }
+        // Initialize the imageViews array and set click listeners
+        for (int i = 0; i < 3; i++) {
+            TableRow row = (TableRow) tableLayout.getChildAt(i);
+            for (int j = 0; j < 3; j++) {
+                final int rowIdx = i;
+                final int colIdx = j;
+                ImageView imageView = (ImageView) row.getChildAt(j);
+                imageViews[i][j] = imageView;
+                imageView.setOnClickListener(new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        if (!gameEnded && board[rowIdx][colIdx] == 0) {
+                            makeMove(rowIdx, colIdx);
+                            checkGameStatus();
+                        }
+                    }
+                });
             }
         }
+
+        btnReset.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                resetGame();
+            }
+        });
+
+        resetGame();
     }
-    private int getSymbolImage(char symbol) {
-        if (symbol == 'X') {
-            return R.drawable.x;
-        } else if (symbol == 'O') {
-            return R.drawable.o;
+
+    private void makeMove(int row, int col) {
+        if (currentPlayer == 1) {
+            imageViews[row][col].setImageResource(R.drawable.x);
+            board[row][col] = 1;
+            currentPlayer = 2;
+        } else {
+            imageViews[row][col].setImageResource(R.drawable.o);
+            board[row][col] = 2;
+            currentPlayer = 1;
         }
-        return R.drawable.empty;
     }
 
-    private void showWinnerAlert() {
-        AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        builder.setTitle("¡Tenemos un ganador!");
-        builder.setMessage("El jugador " + currentPlayer + " ha ganado el juego.");
-        builder.setPositiveButton("Reiniciar", new DialogInterface.OnClickListener() {
-            @Override
-            public void onClick(DialogInterface dialog, int which) {
-                resetBoard();
-            }
-        });
-        builder.setCancelable(false);
-        builder.show();
+    private void checkGameStatus() {
+        if (checkWin(1)) {
+            showToast("Player X wins!");
+            gameEnded = true;
+        } else if (checkWin(2)) {
+            showToast("Player O wins!");
+            gameEnded = true;
+        } else if (isBoardFull()) {
+            showToast("It's a draw!");
+            gameEnded = true;
+        }
     }
 
-    private void showDrawAlert() {
-        AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        builder.setTitle("¡Empate!");
-        builder.setMessage("El juego ha terminado en empate.");
-        builder.setPositiveButton("Reiniciar", new DialogInterface.OnClickListener() {
-            @Override
-            public void onClick(DialogInterface dialog, int which) {
-                resetBoard();
-            }
-        });
-        builder.setCancelable(false);
-        builder.show();
-    }
-
-    private boolean checkWin() {
-        int[][] positions = {
-                {0, 1, 2},
-                {3, 4, 5},
-                {6, 7, 8},
-                {0, 3, 6},
-                {1, 4, 7},
-                {2, 5, 8},
-                {0, 4, 8},
-                {2, 4, 6}
-        };
-
-        for (int[] pos : positions) {
-            if (checkLine(pos[0], pos[1], pos[2]))
+    private boolean checkWin(int player) {
+        // Check rows
+        for (int i = 0; i < 3; i++) {
+            if (board[i][0] == player && board[i][1] == player && board[i][2] == player)
                 return true;
         }
+
+        // Check columns
+        for (int i = 0; i < 3; i++) {
+            if (board[0][i] == player && board[1][i] == player && board[2][i] == player)
+                return true;
+        }
+
+        // Check diagonals
+        if (board[0][0] == player && board[1][1] == player && board[2][2] == player)
+            return true;
+
+        if (board[0][2] == player && board[1][1] == player && board[2][0] == player)
+            return true;
+
         return false;
     }
 
-    private boolean checkLine(int a, int b, int c) {
-        return (getSymbolFromCell(a) == currentPlayer && getSymbolFromCell(b) == currentPlayer && getSymbolFromCell(c) == currentPlayer);
-    }
-
-    private char getSymbolFromCell(int cell) {
-        ImageView imageView;
-        switch (cell) {
-            case 0:
-                imageView = imageView1;
-                break;
-            case 1:
-                imageView = imageView2;
-                break;
-            case 2:
-                imageView = imageView3;
-                break;
-            case 3:
-                imageView = imageView4;
-                break;
-            case 4:
-                imageView = imageView5;
-                break;
-            case 5:
-                imageView = imageView6;
-                break;
-            case 6:
-                imageView = imageView7;
-                break;
-            case 7:
-                imageView = imageView8;
-                break;
-            case 8:
-                imageView = imageView9;
-                break;
-            default:
-                imageView = null;
-        }
-
-        if (imageView != null) {
-            if (imageView.getTag() != null) {
-                return (char) imageView.getTag();
+    private boolean isBoardFull() {
+        for (int i = 0; i < 3; i++) {
+            for (int j = 0; j < 3; j++) {
+                if (board[i][j] == 0)
+                    return false;
             }
         }
-        return ' ';
+        return true;
+    }
+
+    private void resetGame() {
+        currentPlayer = new Random().nextInt(2) + 1; // Randomly choose player 1 or 2
+        gameEnded = false;
+        clearBoard();
+    }
+
+    private void clearBoard() {
+        for (int i = 0; i < 3; i++) {
+            for (int j = 0; j < 3; j++) {
+                imageViews[i][j].setImageResource(R.drawable.empty);
+                board[i][j] = 0;
+            }
+        }
+    }
+
+    private void showToast(String message) {
+        Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
     }
 }

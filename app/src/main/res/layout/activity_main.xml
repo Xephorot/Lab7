@@ -96,7 +96,7 @@
         android:id="@+id/temporizador"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Temporizador"
+        android:text="Tic Tac Toe"
         android:textSize="60dp"
         app:layout_constraintBottom_toTopOf="@+id/tableLayout"
         app:layout_constraintEnd_toEndOf="parent"
