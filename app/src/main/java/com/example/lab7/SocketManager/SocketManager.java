@@ -1,4 +1,7 @@
 package com.example.lab7.SocketManager;
+
+import android.os.AsyncTask;
+
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -7,39 +10,42 @@ import java.net.ServerSocket;
 import java.net.Socket;
 
 public class SocketManager {
-    private ServerSocket serverSocket;
-    private Socket clientSocket;
-    private PrintWriter out;
-    private BufferedReader in;
 
     private static final int PORT = 12345;
 
-    public interface SocketListener {
-        void onMessageReceived(String message);
-
-        void onClientConnected();
-
-        void onClientDisconnected();
-    }
-
+    private ServerSocket serverSocket;
+    private Socket clientSocket;
+    private BufferedReader inputStream;
+    private PrintWriter outputStream;
     private SocketListener socketListener;
+    private String serverIp;
 
     public SocketManager(SocketListener listener) {
         socketListener = listener;
     }
 
     public void startServer() {
-        try {
-            serverSocket = new ServerSocket(PORT);
-            waitForClient();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    serverSocket = new ServerSocket(PORT);
+                    waitForClient();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        }).start();
     }
 
-    public void connectToServer(String serverIP) {
+    public void connectToServer(String serverIp) {
+        this.serverIp = serverIp;
+        new ConnectToServerTask().execute();
+    }
+
+    private void connectToServerInternal() {
         try {
-            clientSocket = new Socket(serverIP, PORT);
+            clientSocket = new Socket(serverIp, PORT);
             initializeStreams();
             socketListener.onClientConnected();
             startListening();
@@ -48,17 +54,35 @@ public class SocketManager {
         }
     }
 
+    public void initializeStreams() throws IOException {
+        inputStream = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
+        outputStream = new PrintWriter(clientSocket.getOutputStream(), true);
+    }
+
+    public void startListening() {
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    String message;
+                    while ((message = inputStream.readLine()) != null) {
+                        socketListener.onMessageReceived(message);
+                    }
+                } catch (IOException e) {
+                    e.printStackTrace();
+                    closeConnection();
+                }
+            }
+        }).start();
+    }
+
     public void sendMessage(String message) {
-        if (out != null) {
-            out.println(message);
-        }
+        new SendMessageTask().execute(message);
     }
 
     public void stopServer() {
+        closeConnection();
         try {
-            if (clientSocket != null && !clientSocket.isClosed()) {
-                clientSocket.close();
-            }
             if (serverSocket != null && !serverSocket.isClosed()) {
                 serverSocket.close();
             }
@@ -78,26 +102,54 @@ public class SocketManager {
         }
     }
 
-    private void initializeStreams() throws IOException {
-        out = new PrintWriter(clientSocket.getOutputStream(), true);
-        in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
+    private void closeConnection() {
+        try {
+            if (inputStream != null) {
+                inputStream.close();
+            }
+            if (outputStream != null) {
+                outputStream.close();
+            }
+            if (clientSocket != null && !clientSocket.isClosed()) {
+                clientSocket.close();
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        socketListener.onClientDisconnected();
     }
 
-    private void startListening() {
-        Thread thread = new Thread(new Runnable() {
-            @Override
-            public void run() {
-                String message;
-                try {
-                    while ((message = in.readLine()) != null) {
-                        socketListener.onMessageReceived(message);
-                    }
-                } catch (IOException e) {
-                    e.printStackTrace();
-                    socketListener.onClientDisconnected();
-                }
+    public interface SocketListener {
+        void onMessageReceived(String message);
+        void onClientConnected();
+        void onClientDisconnected();
+    }
+
+    private class ConnectToServerTask extends AsyncTask<Void, Void, Void> {
+        @Override
+        protected Void doInBackground(Void... params) {
+            connectToServerInternal();
+            return null;
+        }
+    }
+
+    private class SendMessageTask extends AsyncTask<String, Void, Void> {
+        @Override
+        protected Void doInBackground(String... params) {
+            String message = params[0];
+            if (outputStream != null) {
+                outputStream.println(message);
+            } else {
+                reconnect();
             }
-        });
-        thread.start();
+            return null;
+        }
+    }
+
+    public void reconnect() {
+        if (clientSocket != null && clientSocket.isConnected()) {
+            closeConnection();
+        }
+        connectToServer(serverIp);
     }
 }

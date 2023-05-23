@@ -5,17 +5,22 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import android.content.DialogInterface;
 import android.os.Bundle;
-import android.os.CountDownTimer;
 import android.view.View;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.TableLayout;
 import android.widget.TableRow;
-import android.widget.TextView;
 import android.widget.Toast;
 
 import com.example.lab7.SocketManager.SocketManager;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.PrintWriter;
+import java.net.ServerSocket;
+import java.net.Socket;
 import java.util.Random;
 
 public class MainActivity extends AppCompatActivity implements SocketManager.SocketListener {
@@ -67,36 +72,80 @@ public class MainActivity extends AppCompatActivity implements SocketManager.Soc
             }
         });
 
-        resetGame();
+        showStartGameDialog();
     }
 
-    @Override
-    protected void onDestroy() {
-        super.onDestroy();
-        socketManager.stopServer();
+    private void showStartGameDialog() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Start New Game or Join Existing Game?");
+        builder.setPositiveButton("Start New Game", new DialogInterface.OnClickListener() {
+            public void onClick(DialogInterface dialog, int id) {
+                socketManager.startServer();
+            }
+        });
+        builder.setNegativeButton("Join Existing Game", new DialogInterface.OnClickListener() {
+            public void onClick(DialogInterface dialog, int id) {
+                showEnterIpDialog();
+            }
+        });
+        AlertDialog dialog = builder.create();
+        dialog.show();
+    }
+
+    private void showEnterIpDialog() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Enter Server IP Address");
+
+        final EditText input = new EditText(this);
+        builder.setView(input);
+
+        builder.setPositiveButton("OK", new DialogInterface.OnClickListener() {
+            public void onClick(DialogInterface dialog, int id) {
+                String serverIp = input.getText().toString();
+                socketManager.connectToServer(serverIp);
+            }
+        });
+        builder.setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
+            public void onClick(DialogInterface dialog, int id) {
+                dialog.cancel();
+            }
+        });
+        AlertDialog dialog = builder.create();
+        dialog.show();
     }
 
     private void makeMove(int row, int col) {
-        if (currentPlayer == 1) {
-            imageViews[row][col].setImageResource(R.drawable.x);
-            board[row][col] = 1;
-            currentPlayer = 2;
-        } else {
-            imageViews[row][col].setImageResource(R.drawable.o);
-            board[row][col] = 2;
-            currentPlayer = 1;
-        }
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                if (currentPlayer == 1) {
+                    imageViews[row][col].setImageResource(R.drawable.x);
+                    board[row][col] = 1;
+                    currentPlayer = 2;
+                } else {
+                    imageViews[row][col].setImageResource(R.drawable.o);
+                    board[row][col] = 2;
+                    currentPlayer = 1;
+                }
+            }
+        });
     }
 
     private void checkGameStatus() {
         if (checkWin(1)) {
-            showToast("Player X wins!");
+            String message = "Player X wins!";
+            showToast(message);
+            showWinMessage(message);
             gameEnded = true;
         } else if (checkWin(2)) {
-            showToast("Player O wins!");
+            String message = "Player O wins!";
+            showToast(message);
+            showWinMessage(message);
             gameEnded = true;
         } else if (isBoardFull()) {
-            showToast("It's a draw!");
+            String message = "It's a draw!";
+            showToast(message);
+            showWinMessage(message);
             gameEnded = true;
         }
     }
@@ -141,16 +190,35 @@ public class MainActivity extends AppCompatActivity implements SocketManager.Soc
     }
 
     private void clearBoard() {
-        for (int i = 0; i < 3; i++) {
-            for (int j = 0; j < 3; j++) {
-                imageViews[i][j].setImageResource(R.drawable.empty);
-                board[i][j] = 0;
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                for (int i = 0; i < 3; i++) {
+                    for (int j = 0; j < 3; j++) {
+                        imageViews[i][j].setImageResource(R.drawable.empty);
+                        board[i][j] = 0;
+                    }
+                }
             }
-        }
+        });
     }
 
     private void showToast(String message) {
         Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
+    }
+
+    private void showWinMessage(String message) {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Game Over");
+        builder.setMessage(message);
+        builder.setPositiveButton("OK", new DialogInterface.OnClickListener() {
+            public void onClick(DialogInterface dialog, int id) {
+                resetGame();
+                sendResetToOpponent();
+            }
+        });
+        AlertDialog dialog = builder.create();
+        dialog.show();
     }
 
     private void sendMoveToOpponent(int row, int col) {
@@ -183,11 +251,21 @@ public class MainActivity extends AppCompatActivity implements SocketManager.Soc
 
     @Override
     public void onClientConnected() {
-        showToast("Opponent connected");
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                showToast("Opponent connected");
+            }
+        });
     }
 
     @Override
     public void onClientDisconnected() {
-        showToast("Opponent disconnected");
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                showToast("Opponent disconnected");
+            }
+        });
     }
 }
